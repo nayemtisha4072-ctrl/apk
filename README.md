@@ -52,7 +52,7 @@ app/src/main/java/com/example/
 ## Building Locally
 
 ### Prerequisites
-- JDK 17+
+- JDK 21+
 - Android SDK (Compile SDK 36, Min SDK 24, Target SDK 36)
 
 ### Debug APK (Personal Testing)
