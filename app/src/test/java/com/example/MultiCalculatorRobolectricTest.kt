@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -160,7 +161,7 @@ class MultiCalculatorRobolectricTest {
 
     @Test
     fun `compose ui calculates saves history and navigates all four sections`() {
-        val container = AppContainer(context)
+        val container = AppContainer(context, enableCloudSync = false)
         composeRule.setContent {
             MultiCalculatorTheme {
                 MultiCalculatorApp(container = container)
@@ -206,5 +207,19 @@ class MultiCalculatorRobolectricTest {
         composeRule.onNodeWithTag("nav_tab_settings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_theme_dark").assertIsDisplayed()
+    }
+
+    @Test
+    fun `auth screen displays visible sign in with google button`() {
+        composeRule.setContent {
+            MultiCalculatorTheme {
+                com.example.ui.screens.AuthScreen(attemptSilentSignIn = false)
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("google_sign_in_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Sign in with Google").assertIsDisplayed()
     }
 }

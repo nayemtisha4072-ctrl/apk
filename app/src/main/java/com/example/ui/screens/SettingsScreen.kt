@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.filled.Wifi
@@ -61,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import com.example.BuildConfig
 import com.example.R
 import com.example.data.preferences.CalculatorMode
+import com.example.data.repository.CloudSyncStatus
 import com.example.domain.math.AngleUnit
 import com.example.ui.theme.ThemeMode
 import com.example.viewmodel.SettingsUiState
@@ -87,6 +91,8 @@ fun SettingsScreen(
     onRestoreBackupJson: (String) -> Unit,
     onShowPrivacyOptions: (Activity) -> Unit,
     onWatchRewardedAd: (Activity) -> Unit,
+    onSyncNow: () -> Unit = {},
+    onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -94,6 +100,7 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var showClearConfirm by remember { mutableStateOf(false) }
+    var showSignOutConfirm by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -302,7 +309,7 @@ fun SettingsScreen(
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
                     ) {
                         Row(
                             modifier = Modifier
@@ -312,21 +319,71 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.CloudOff,
+                                imageVector = if (uiState.cloudSyncStatus is CloudSyncStatus.Syncing) {
+                                    Icons.Filled.CloudSync
+                                } else {
+                                    Icons.Filled.CloudDone
+                                },
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Text(
-                                    text = "Google Cloud Sync Not Configured (Local-Only Mode)",
+                                    text = uiState.accountDisplayName?.takeIf { it.isNotBlank() }
+                                        ?: "Google Account Connected",
                                     style = MaterialTheme.typography.titleMedium
                                 )
+                                uiState.accountEmail?.takeIf { it.isNotBlank() }?.let { email ->
+                                    Text(
+                                        text = email,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                val syncLabel = when (val status = uiState.cloudSyncStatus) {
+                                    CloudSyncStatus.Idle -> "Cloud Sync Ready"
+                                    CloudSyncStatus.Syncing -> "Syncing notes & history..."
+                                    is CloudSyncStatus.Synced ->
+                                        "Synced (${status.notesCount} notes, ${status.historyCount} history) · ${dateFormatter.format(Date(status.lastSyncedMillis))}"
+                                    is CloudSyncStatus.Error ->
+                                        "Sync pending (${status.message}) — offline changes stay queued safely"
+                                }
                                 Text(
-                                    text = "Firebase Auth & Cloud Firestore were not provisioned in this build, so all notes and history stay safely on this device offline. When configured for Play release, cloud availability remains subject to service/account retention policies—always keep JSON backups.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = syncLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = onSyncNow,
+                            enabled = uiState.cloudSyncStatus !is CloudSyncStatus.Syncing,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_sync_now_btn")
+                        ) {
+                            Icon(Icons.Filled.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.size(6.dp))
+                            Text(if (uiState.cloudSyncStatus is CloudSyncStatus.Syncing) "Syncing..." else "Sync Now")
+                        }
+                        OutlinedButton(
+                            onClick = { showSignOutConfirm = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_sign_out_btn")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.size(6.dp))
+                            Text("Sign Out")
                         }
                     }
 
@@ -493,7 +550,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
             title = { Text("Clear all calculation history?") },
-            text = { Text("This removes every locally saved calculation entry from this device.") },
+            text = { Text("This removes every calculation entry from this device and your synced Google Cloud history.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -507,6 +564,27 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showSignOutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirm = false },
+            title = { Text("Sign out of Google?") },
+            text = { Text("Your synced Notes and Calculation History remain safely stored in your Google account and will restore automatically next time you sign in.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutConfirm = false
+                        onSignOut()
+                    }
+                ) {
+                    Text("Sign Out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirm = false }) { Text("Cancel") }
             }
         )
     }

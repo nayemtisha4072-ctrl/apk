@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Google user profile metadata for Multi Calculator cloud sync.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning user."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Google account display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Google account email address (owner-only PII)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on update."
+        }
+      },
+      "required": ["userId", "createdAt", "updatedAt"]
+    },
+    "CloudNote": {
+      "title": "CloudNote",
+      "description": "User-authored notepad document synced across devices and reinstalls.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning user."
+        },
+        "title": {
+          "type": "string",
+          "description": "Note title."
+        },
+        "content": {
+          "type": "string",
+          "description": "Full note text body."
+        },
+        "isPinned": {
+          "type": "boolean",
+          "description": "Whether the note is pinned at the top of the list."
+        },
+        "clientCreatedAtMillis": {
+          "type": "integer",
+          "description": "Original note creation epoch milliseconds preserved across sync."
+        },
+        "clientUpdatedAtMillis": {
+          "type": "integer",
+          "description": "Last modification epoch milliseconds used for conflict resolution."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "content",
+        "isPinned",
+        "clientCreatedAtMillis",
+        "clientUpdatedAtMillis",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudHistoryEntry": {
+      "title": "CloudHistoryEntry",
+      "description": "Arbitrary-precision calculation history entry synced across devices and reinstalls.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning user."
+        },
+        "expression": {
+          "type": "string",
+          "description": "Full mathematical expression string."
+        },
+        "result": {
+          "type": "string",
+          "description": "Exact or configured-precision calculation result string."
+        },
+        "calculatorMode": {
+          "type": "string",
+          "enum": ["STANDARD", "SCIENTIFIC"],
+          "description": "Calculator mode used when evaluating the expression."
+        },
+        "angleUnit": {
+          "type": "string",
+          "enum": ["DEG", "RAD"],
+          "description": "Trigonometric angle unit used when evaluating."
+        },
+        "precision": {
+          "type": "integer",
+          "description": "Configured decimal precision (16..100)."
+        },
+        "isApproximated": {
+          "type": "boolean",
+          "description": "Whether decimal/transcendental rounding occurred."
+        },
+        "clientCreatedAtMillis": {
+          "type": "integer",
+          "description": "Original calculation epoch milliseconds preserved across sync."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "expression",
+        "result",
+        "calculatorMode",
+        "angleUnit",
+        "precision",
+        "isApproximated",
+        "clientCreatedAtMillis",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user profile root document."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/CloudNote" },
+      "description": "Per-user synced notepad documents keyed by note UUID."
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": { "$ref": "#/entities/CloudHistoryEntry" },
+      "description": "Per-user synced calculation history documents keyed by entry UUID."
+    }
+  }
+}

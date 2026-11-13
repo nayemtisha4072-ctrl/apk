@@ -36,14 +36,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -56,12 +59,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.example.ads.AdBannerBar
+import com.example.data.auth.authStateFlow
 import com.example.di.AppContainer
 import com.example.ui.navigation.CalculatorRoute
 import com.example.ui.navigation.HistoryRoute
 import com.example.ui.navigation.NoteEditorRoute
 import com.example.ui.navigation.NotesRoute
 import com.example.ui.navigation.SettingsRoute
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.CalculatorScreen
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.NoteEditorScreen
@@ -76,6 +81,9 @@ import com.example.viewmodel.NotesEvent
 import com.example.viewmodel.NotesViewModel
 import com.example.viewmodel.SettingsEvent
 import com.example.viewmodel.SettingsViewModel
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -95,7 +103,7 @@ class MainActivity : ComponentActivity() {
                 initialValue = com.example.data.preferences.UserPreferences()
             )
             MultiCalculatorTheme(themeMode = prefs.themeMode) {
-                MultiCalculatorApp(
+                AppNavigation(
                     container = container,
                     activity = this
                 )
@@ -120,15 +128,50 @@ private data class TopLevelTab(
 )
 
 @Composable
-fun MultiCalculatorApp(
+fun AppNavigation(
     container: AppContainer,
     activity: MainActivity? = null
 ) {
+    val auth = remember { Firebase.auth }
+    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(
+        initialValue = auth.currentUser
+    )
+    val user = currentUser
+    if (user == null) {
+        AuthScreen()
+    } else {
+        key(user.uid) {
+            MultiCalculatorApp(
+                container = container,
+                currentUser = user,
+                activity = activity
+            )
+        }
+    }
+}
+
+@Composable
+fun MultiCalculatorApp(
+    container: AppContainer,
+    currentUser: FirebaseUser? = null,
+    activity: MainActivity? = null
+) {
+    val context = LocalContext.current
+    val credentialManager = remember(context) { CredentialManager.create(context) }
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val userKey = currentUser?.uid
+
+    LaunchedEffect(userKey) {
+        if (currentUser != null) {
+            launch { container.repository.syncWithCloud(currentUser) }
+            container.repository.collectRealtimeCloudUpdates()
+        }
+    }
 
     val calculatorViewModel: CalculatorViewModel = viewModel(
+        key = userKey,
         factory = viewModelFactory {
             initializer {
                 CalculatorViewModel(
@@ -140,23 +183,28 @@ fun MultiCalculatorApp(
         }
     )
     val historyViewModel: HistoryViewModel = viewModel(
+        key = userKey,
         factory = viewModelFactory {
             initializer { HistoryViewModel(container.repository) }
         }
     )
     val notesViewModel: NotesViewModel = viewModel(
+        key = userKey,
         factory = viewModelFactory {
             initializer { NotesViewModel(container.repository) }
         }
     )
     val settingsViewModel: SettingsViewModel = viewModel(
+        key = userKey,
         factory = viewModelFactory {
             initializer {
                 SettingsViewModel(
                     repository = container.repository,
                     preferencesRepository = container.preferencesRepository,
                     connectivityMonitor = container.connectivityMonitor,
-                    adMobManager = container.adMobManager
+                    adMobManager = container.adMobManager,
+                    accountDisplayName = currentUser?.displayName,
+                    accountEmail = currentUser?.email
                 )
             }
         }
@@ -443,7 +491,9 @@ fun MultiCalculatorApp(
                                     onBackupFailed = settingsViewModel::notifyBackupFailed,
                                     onRestoreBackupJson = settingsViewModel::restoreFromBackupJson,
                                     onShowPrivacyOptions = settingsViewModel::showPrivacyOptions,
-                                    onWatchRewardedAd = settingsViewModel::watchVoluntaryRewardedAd
+                                    onWatchRewardedAd = settingsViewModel::watchVoluntaryRewardedAd,
+                                    onSyncNow = settingsViewModel::syncNow,
+                                    onSignOut = { settingsViewModel.signOut(credentialManager) }
                                 )
                             }
                         }

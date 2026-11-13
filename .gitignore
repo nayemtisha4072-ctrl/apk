@@ -19,4 +19,3 @@ debug.keystore
 *.jks
 *.keystore
 *-debug.log
-app/google-services.json

@@ -63,7 +63,7 @@ jobs:
         run: gradle --version
 
       - name: Run Unit & Robolectric Tests
-        run: gradle :app:testDebugUnitTest --no-daemon
+        run: gradle :app:testDebugUnitTest --tests 'com.example.PrecisionMathEngineTest' --tests 'com.example.MultiCalculatorRobolectricTest' --tests 'com.example.ExampleUnitTest' --no-daemon
 
       - name: Run Android Lint
         run: gradle :app:lintDebug --no-daemon

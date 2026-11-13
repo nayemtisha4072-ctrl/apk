@@ -1,17 +1,22 @@
 package com.example.viewmodel
 
 import android.app.Activity
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ads.AdActionState
 import com.example.ads.AdMobManager
+import com.example.data.auth.GoogleAuthManager
 import com.example.data.network.ConnectivityMonitor
 import com.example.data.preferences.CalculatorMode
 import com.example.data.preferences.UserPreferences
 import com.example.data.preferences.UserPreferencesRepository
+import com.example.data.repository.CloudSyncStatus
 import com.example.data.repository.MultiCalculatorRepository
 import com.example.domain.math.AngleUnit
 import com.example.ui.theme.ThemeMode
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,7 +30,10 @@ data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
     val isOnline: Boolean = false,
     val isPrivacyOptionsRequired: Boolean = false,
-    val rewardedAdState: AdActionState = AdActionState.Idle
+    val rewardedAdState: AdActionState = AdActionState.Idle,
+    val cloudSyncStatus: CloudSyncStatus = CloudSyncStatus.Idle,
+    val accountDisplayName: String? = null,
+    val accountEmail: String? = null
 )
 
 sealed interface SettingsEvent {
@@ -36,7 +44,9 @@ class SettingsViewModel(
     private val repository: MultiCalculatorRepository,
     private val preferencesRepository: UserPreferencesRepository,
     private val connectivityMonitor: ConnectivityMonitor,
-    private val adMobManager: AdMobManager
+    private val adMobManager: AdMobManager,
+    private val accountDisplayName: String? = null,
+    private val accountEmail: String? = null
 ) : ViewModel() {
 
     private val _events = MutableSharedFlow<SettingsEvent>()
@@ -46,18 +56,25 @@ class SettingsViewModel(
         preferencesRepository.preferences,
         connectivityMonitor.isOnline,
         adMobManager.isPrivacyOptionsRequired,
-        adMobManager.rewardedState
-    ) { prefs, online, privacyRequired, rewardedState ->
+        adMobManager.rewardedState,
+        repository.cloudSyncStatus
+    ) { prefs, online, privacyRequired, rewardedState, syncStatus ->
         SettingsUiState(
             preferences = prefs,
             isOnline = online,
             isPrivacyOptionsRequired = privacyRequired,
-            rewardedAdState = rewardedState
+            rewardedAdState = rewardedState,
+            cloudSyncStatus = syncStatus,
+            accountDisplayName = accountDisplayName,
+            accountEmail = accountEmail
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000L),
-        initialValue = SettingsUiState()
+        initialValue = SettingsUiState(
+            accountDisplayName = accountDisplayName,
+            accountEmail = accountEmail
+        )
     )
 
     fun setThemeMode(mode: ThemeMode) {
@@ -78,6 +95,40 @@ class SettingsViewModel(
 
     fun setUseScientificNotation(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setUseScientificNotation(enabled) }
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            val user = runCatching { Firebase.auth.currentUser }.getOrNull()
+            repository.syncWithCloud(user)
+                .onSuccess { summary ->
+                    val restoredTotal = summary.notesRestored + summary.historyRestored
+                    val msg = if (restoredTotal > 0) {
+                        "Synced! Restored ${summary.notesRestored} notes & ${summary.historyRestored} history items"
+                    } else {
+                        "All notes and history are synced with Google Cloud"
+                    }
+                    _events.emit(SettingsEvent.ShowMessage(msg))
+                }
+                .onFailure { err ->
+                    _events.emit(
+                        SettingsEvent.ShowMessage(
+                            "Sync failed: ${err.localizedMessage ?: "Check internet connection"}"
+                        )
+                    )
+                }
+        }
+    }
+
+    fun signOut(credentialManager: CredentialManager) {
+        viewModelScope.launch {
+            val user = runCatching { Firebase.auth.currentUser }.getOrNull()
+            if (user != null) {
+                runCatching { repository.syncWithCloud(user) }
+            }
+            repository.clearLocalCacheForSignOut()
+            GoogleAuthManager.signOut(credentialManager)
+        }
     }
 
     fun clearHistory() {
