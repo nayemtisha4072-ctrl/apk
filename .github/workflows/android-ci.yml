@@ -58,7 +58,7 @@ jobs:
           if [ -f debug.keystore.base64 ] && base64 --decode debug.keystore.base64 > debug.keystore; then
             echo "Decoded debug.keystore from debug.keystore.base64"
           elif [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
-            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > debug.keystore
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d ' \t\r\n' | base64 --decode > debug.keystore
             echo "Decoded debug.keystore from DEBUG_KEYSTORE_BASE64 secret"
           elif [ ! -f debug.keystore ]; then
             keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"

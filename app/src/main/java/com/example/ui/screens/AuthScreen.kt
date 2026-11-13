@@ -177,6 +177,7 @@ fun AuthScreen(
                                 }
                                 GoogleSignInResult.Cancelled -> {
                                     isLoading = false
+                                    errorMessage = "Sign-in was cancelled. Please select a Google account to continue."
                                 }
                                 is GoogleSignInResult.Error -> {
                                     isLoading = false

@@ -92,6 +92,12 @@ object GoogleAuthManager {
             return GoogleSignInResult.Error("Google Sign-In configuration missing: default_web_client_id not found")
         }
 
+        if (clientId.isBlank() || clientId == "ci-placeholder-web-client-id") {
+            return GoogleSignInResult.Error(
+                "This GitHub CI build is missing Firebase config. Add GOOGLE_SERVICES_JSON and DEBUG_KEYSTORE_BASE64 to GitHub Secrets, or generate the APK directly from AI Studio."
+            )
+        }
+
         val activity = context as? Activity
             ?: return GoogleSignInResult.Error("Interactive sign-in requires an active screen context.")
 
