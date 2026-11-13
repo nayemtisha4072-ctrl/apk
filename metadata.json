@@ -1,0 +1,6 @@
+{
+  "name": "Multi Calculator",
+  "description": "Arbitrary-precision Standard and Scientific Calculator with an integrated Notepad, Calculation History, offline Room storage, Google Sign-In cloud sync, and AdMob monetization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
