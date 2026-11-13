@@ -12,29 +12,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Android SDK & Accept Licenses
+        run: |
+          ANDROID_SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p "$ANDROID_SDK"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> "$GITHUB_ENV"
+
+          SDKMANAGER=$(find "$ANDROID_SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)
+          if [ -z "$SDKMANAGER" ]; then
+            mkdir -p "$ANDROID_SDK/cmdline-tools"
+            curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+            unzip -q -o /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-extract
+            mv /tmp/cmdline-tools-extract/cmdline-tools "$ANDROID_SDK/cmdline-tools/latest"
+            rm -rf /tmp/cmdline-tools.zip /tmp/cmdline-tools-extract
+            SDKMANAGER="$ANDROID_SDK/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK/platform-tools" >> "$GITHUB_PATH"
+
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --licenses > /dev/null 2>&1 || true
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK" "platform-tools" "build-tools;36.0.0" "platforms;android-36.1"
 
       - name: Setup Gradle 9.3.1
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
+          cache-provider: basic
 
       - name: Prepare Debug Keystore
         run: |
-          if [ -f debug.keystore.base64 ]; then
-            base64 --decode debug.keystore.base64 > debug.keystore
+          if [ -f debug.keystore.base64 ] && base64 --decode debug.keystore.base64 > debug.keystore; then
+            echo "Decoded debug.keystore from debug.keystore.base64"
           elif [ ! -f debug.keystore ]; then
             keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
+
+      - name: Verify Gradle Version
+        run: gradle --version
 
       - name: Run Unit & Robolectric Tests
         run: gradle :app:testDebugUnitTest --no-daemon
@@ -46,7 +72,7 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: multi-calculator-debug-apk
           path: app/build/outputs/apk/debug/*.apk
@@ -73,24 +99,34 @@ jobs:
 
       - name: Checkout repository
         if: steps.check_secrets.outputs.has_keystore == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
         if: steps.check_secrets.outputs.has_keystore == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK & Accept Licenses
         if: steps.check_secrets.outputs.has_keystore == 'true'
-        uses: android-actions/setup-android@v3
+        run: |
+          ANDROID_SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p "$ANDROID_SDK"
+          echo "ANDROID_HOME=$ANDROID_SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_SDK" --licenses > /dev/null 2>&1 || true
+          set -o pipefail
+          "$SDKMANAGER" --sdk_root="$ANDROID_SDK" "platform-tools" "build-tools;36.0.0" "platforms;android-36.1"
 
       - name: Setup Gradle 9.3.1
         if: steps.check_secrets.outputs.has_keystore == 'true'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
+          cache-provider: basic
 
       - name: Decode Release Keystore
         if: steps.check_secrets.outputs.has_keystore == 'true'
@@ -116,7 +152,7 @@ jobs:
 
       - name: Upload Signed Release AAB
         if: steps.check_secrets.outputs.has_keystore == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: multi-calculator-release-aab
           path: app/build/outputs/bundle/release/*.aab
