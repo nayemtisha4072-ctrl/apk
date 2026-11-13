@@ -380,10 +380,10 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (BuildConfig.USE_TEST_ADS) {
-                                "AdMob Mode: Test Ads (Debug)"
-                            } else {
-                                "AdMob Mode: Production Release"
+                            text = when {
+                                !BuildConfig.ADS_ENABLED -> "Ads Status: Turned Off (Ad-Free Mode)"
+                                BuildConfig.USE_TEST_ADS -> "AdMob Mode: Test Ads (Debug)"
+                                else -> "AdMob Mode: Production Release"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -402,20 +402,28 @@ fun SettingsScreen(
                         }
                     }
 
-                    Button(
-                        onClick = { activity?.let(onWatchRewardedAd) },
-                        enabled = uiState.isOnline && activity != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("settings_rewarded_ad_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.VolunteerActivism,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                    if (BuildConfig.ADS_ENABLED) {
+                        Button(
+                            onClick = { activity?.let(onWatchRewardedAd) },
+                            enabled = uiState.isOnline && activity != null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_rewarded_ad_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.VolunteerActivism,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Support Multi Calculator (Watch Voluntary Ad)")
+                        }
+                    } else {
+                        Text(
+                            text = "Test ads are currently disabled. Configure production AdMob IDs for release when ready to monetize.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Support Multi Calculator (Watch Voluntary Ad)")
                     }
 
                     if (uiState.isPrivacyOptionsRequired && activity != null) {

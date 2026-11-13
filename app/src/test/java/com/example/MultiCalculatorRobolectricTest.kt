@@ -152,9 +152,10 @@ class MultiCalculatorRobolectricTest {
     }
 
     @Test
-    fun `debug build uses test ad configuration and never blocks calculation flow`() {
-        assertTrue(BuildConfig.USE_TEST_ADS)
-        assertTrue(BuildConfig.ADMOB_BANNER_ID.startsWith("ca-app-pub-3940256099942544"))
+    fun `debug build has test ads disabled and never blocks calculation flow`() {
+        org.junit.Assert.assertFalse(BuildConfig.ADS_ENABLED)
+        org.junit.Assert.assertFalse(BuildConfig.USE_TEST_ADS)
+        assertTrue(BuildConfig.ADMOB_BANNER_ID.isEmpty())
     }
 
     @Test

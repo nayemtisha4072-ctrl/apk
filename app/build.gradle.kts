@@ -65,7 +65,12 @@ android {
         ?: (project.findProperty("ADMOB_REWARDED_ID") as? String)
         ?: ""
 
+      val releaseAdsEnabled = releaseBannerId.isNotBlank() ||
+        releaseInterstitialId.isNotBlank() ||
+        releaseRewardedId.isNotBlank()
+
       manifestPlaceholders["ADMOB_APP_ID"] = releaseAppId
+      buildConfigField("Boolean", "ADS_ENABLED", releaseAdsEnabled.toString())
       buildConfigField("Boolean", "USE_TEST_ADS", "false")
       buildConfigField("String", "ADMOB_BANNER_ID", "\"$releaseBannerId\"")
       buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"$releaseInterstitialId\"")
@@ -76,12 +81,13 @@ android {
       // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
 
-      // Official Google AdMob test IDs strictly isolated to debug builds
-      manifestPlaceholders["ADMOB_APP_ID"] = "ca-app-pub-3940256099942544~3347511713"
-      buildConfigField("Boolean", "USE_TEST_ADS", "true")
-      buildConfigField("String", "ADMOB_BANNER_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
-      buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
-      buildConfigField("String", "ADMOB_REWARDED_ID", "\"ca-app-pub-3940256099942544/5224354917\"")
+      // Test ads disabled for now; enable via USE_TEST_ADS=true and test IDs when testing AdMob.
+      manifestPlaceholders["ADMOB_APP_ID"] = "ca-app-pub-0000000000000000~0000000000"
+      buildConfigField("Boolean", "ADS_ENABLED", "false")
+      buildConfigField("Boolean", "USE_TEST_ADS", "false")
+      buildConfigField("String", "ADMOB_BANNER_ID", "\"\"")
+      buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"\"")
+      buildConfigField("String", "ADMOB_REWARDED_ID", "\"\"")
     }
   }
   compileOptions {

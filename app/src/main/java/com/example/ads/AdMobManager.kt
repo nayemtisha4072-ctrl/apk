@@ -55,7 +55,7 @@ class AdMobManager(private val appContext: Context) {
     private var eligibleActionsSinceLastAd: Int = 0
 
     fun isAdUnitValidForBuild(adUnitId: String): Boolean {
-        if (adUnitId.isBlank()) return false
+        if (!BuildConfig.ADS_ENABLED || adUnitId.isBlank()) return false
         val isGoogleSampleUnit = adUnitId.startsWith(GOOGLE_TEST_PUB_PREFIX)
         if (!BuildConfig.USE_TEST_ADS && isGoogleSampleUnit) {
             Log.e(TAG, "Blocked test ad unit ID in release build")
@@ -65,6 +65,7 @@ class AdMobManager(private val appContext: Context) {
     }
 
     fun hasValidManifestAppId(): Boolean {
+        if (!BuildConfig.ADS_ENABLED) return false
         return runCatching {
             val appInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 appContext.packageManager.getApplicationInfo(
@@ -84,8 +85,8 @@ class AdMobManager(private val appContext: Context) {
     }
 
     fun gatherConsentAndInitialize(activity: Activity) {
-        if (!hasValidManifestAppId()) {
-            Log.i(TAG, "AdMob App ID not configured for this build; ads disabled gracefully.")
+        if (!BuildConfig.ADS_ENABLED || !hasValidManifestAppId()) {
+            Log.i(TAG, "Ads disabled for this build.")
             return
         }
 
